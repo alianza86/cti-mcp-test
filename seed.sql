@@ -1,14 +1,19 @@
 -- Esquema y datos de ejemplo para el MCP de biblioteca.
--- Este archivo lo ejecuta Postgres automáticamente al crear el contenedor.
+--
+-- Es IDEMPOTENTE: se puede ejecutar muchas veces sin romper.
+--   - CREATE TABLE IF NOT EXISTS  -> no falla si ya existe.
+--   - INSERT ... ON CONFLICT DO NOTHING -> no duplica filas.
+-- La app (server.py) lo ejecuta al arrancar, así no dependemos de mounts
+-- ni de tocar el contenedor de Postgres a mano.
 
-CREATE TABLE authors (
+CREATE TABLE IF NOT EXISTS authors (
     id          SERIAL PRIMARY KEY,
-    name        TEXT NOT NULL,
+    name        TEXT NOT NULL UNIQUE,
     country     TEXT,
     birth_year  INT
 );
 
-CREATE TABLE books (
+CREATE TABLE IF NOT EXISTS books (
     id              SERIAL PRIMARY KEY,
     title           TEXT NOT NULL,
     author_id       INT NOT NULL REFERENCES authors(id),
@@ -25,7 +30,8 @@ INSERT INTO authors (name, country, birth_year) VALUES
     ('Jorge Luis Borges',      'Argentina',1899),
     ('Mario Vargas Llosa',     'Perú',     1936),
     ('Julio Cortázar',         'Argentina',1914),
-    ('Octavio Paz',            'México',   1914);
+    ('Octavio Paz',            'México',   1914)
+ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO books (title, author_id, genre, published_year, isbn, available_copies, total_copies) VALUES
     ('Cien años de soledad',        1, 'Realismo mágico', 1967, '978-0307474728', 3, 5),
@@ -38,4 +44,5 @@ INSERT INTO books (title, author_id, genre, published_year, isbn, available_copi
     ('La fiesta del chivo',         4, 'Novela histórica',2000, '978-8420471815', 0, 3),
     ('Rayuela',                     5, 'Novela',          1963, '978-8437604572', 5, 5),
     ('Bestiario',                   5, 'Cuento',          1951, '978-8420672069', 1, 1),
-    ('El laberinto de la soledad',  6, 'Ensayo',          1950, '978-9681603496', 2, 2);
+    ('El laberinto de la soledad',  6, 'Ensayo',          1950, '978-9681603496', 2, 2)
+ON CONFLICT (isbn) DO NOTHING;

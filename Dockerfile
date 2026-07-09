@@ -7,8 +7,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-# 2) Copiar el código de la app.
-COPY server.py ./
+# 2) Copiar el código de la app (server.py ejecuta seed.sql al arrancar).
+COPY server.py seed.sql ./
 
 # El server escucha en este puerto (streamable-http).
 ENV MCP_TRANSPORT=streamable-http \

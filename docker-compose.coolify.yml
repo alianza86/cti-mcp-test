@@ -12,8 +12,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-library}
       POSTGRES_DB: ${POSTGRES_DB:-library}
     volumes:
-      # Carga tablas + datos en el primer arranque (solo si el volumen está vacío).
-      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      # Nota: el seed lo carga la app (server.py -> init_db) al arrancar,
+      # así no dependemos de mounts. Aquí solo persistimos los datos.
       - library_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-library} -d ${POSTGRES_DB:-library}"]

@@ -10,8 +10,8 @@ services:
       # Host 5433 -> contenedor 5432 (el 5432 del host ya estaba ocupado)
       - "5433:5432"
     volumes:
-      # El seed.sql se ejecuta automáticamente la primera vez que arranca el contenedor
-      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      # El seed lo carga la app (server.py -> init_db) al arrancar; aquí solo
+      # levantamos Postgres vacío y persistimos los datos.
       - library_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U library -d library"]

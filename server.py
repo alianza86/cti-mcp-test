@@ -15,7 +15,9 @@ La conexión a la DB se lee de DATABASE_URL (ver README).
 """
 
 import os
+import time
 from contextlib import contextmanager
+from pathlib import Path
 
 import psycopg
 from psycopg.rows import dict_row
@@ -32,6 +34,9 @@ DATABASE_URL = os.environ.get(
 TRANSPORT = os.environ.get("MCP_TRANSPORT", "stdio")
 # Coolify (y la mayoría de PaaS) inyectan el puerto por env.
 PORT = int(os.environ.get("PORT", "8000"))
+# Al arrancar, crea el esquema y carga datos de ejemplo si faltan.
+AUTO_INIT_DB = os.environ.get("AUTO_INIT_DB", "true").lower() == "true"
+SEED_FILE = Path(__file__).parent / "seed.sql"
 
 # El nombre es lo que verá el agente al listar servidores MCP.
 mcp = FastMCP(
@@ -47,6 +52,35 @@ mcp = FastMCP(
 async def health(_: Request) -> PlainTextResponse:
     """Endpoint simple para el health check de Coolify."""
     return PlainTextResponse("ok")
+
+
+def init_db(retries: int = 15, delay: float = 2.0) -> None:
+    """Crea el esquema y carga los datos de ejemplo si aún no existen.
+
+    Ejecuta seed.sql, que es idempotente (CREATE ... IF NOT EXISTS + INSERT ...
+    ON CONFLICT DO NOTHING), así que correrlo en cada arranque es seguro.
+
+    Reintenta mientras Postgres termina de arrancar (útil en Coolify, donde
+    los contenedores levantan en paralelo). Si tras los reintentos no conecta,
+    avisa pero deja arrancar el server (el health check sigue funcionando).
+    """
+    if not AUTO_INIT_DB:
+        return
+    sql = SEED_FILE.read_text(encoding="utf-8")
+    for attempt in range(1, retries + 1):
+        try:
+            with psycopg.connect(DATABASE_URL) as conn:
+                conn.execute(sql)
+            print("[init_db] esquema y datos de ejemplo verificados", flush=True)
+            return
+        except psycopg.OperationalError as exc:
+            print(
+                f"[init_db] Postgres aún no responde "
+                f"(intento {attempt}/{retries}): {exc}",
+                flush=True,
+            )
+            time.sleep(delay)
+    print("[init_db] no se pudo inicializar la DB tras varios intentos", flush=True)
 
 
 @contextmanager
@@ -168,5 +202,8 @@ def library_stats() -> dict:
 
 
 if __name__ == "__main__":
+    # Asegura esquema + datos antes de servir (idempotente; se puede desactivar
+    # con AUTO_INIT_DB=false en el proyecto real).
+    init_db()
     # stdio (local) o streamable-http (desplegado). Ver MCP_TRANSPORT arriba.
     mcp.run(transport=TRANSPORT)

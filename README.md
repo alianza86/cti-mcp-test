@@ -32,8 +32,9 @@ Expone 5 herramientas (`tools`) que el agente puede llamar:
 docker compose up -d
 ```
 
-Esto crea la base `library` y carga `seed.sql` (tablas + datos de ejemplo)
-automáticamente la primera vez.
+Esto levanta Postgres vacío. Las tablas y los datos de ejemplo los crea la
+propia app al arrancar (`init_db` en `server.py`), así que no hay que cargar
+nada a mano.
 
 Para reiniciar los datos desde cero:
 
@@ -107,6 +108,12 @@ Variables de entorno:
 | `DATABASE_URL` | `postgresql://library:library@localhost:5433/library` | Conexión a Postgres |
 | `MCP_TRANSPORT` | `stdio` | `stdio` (local) o `streamable-http` (desplegado) |
 | `PORT` | `8000` | Puerto HTTP (solo con `streamable-http`) |
+| `AUTO_INIT_DB` | `true` | Al arrancar, crea el esquema y carga `seed.sql` si faltan (idempotente) |
+
+> **Seed automático:** la app ejecuta `seed.sql` al arrancar (ver `init_db` en
+> [`server.py`](server.py)). Es idempotente, así que no duplica datos ni depende
+> de mounts ni de tocar el contenedor de Postgres. Ponlo en `false` para el
+> proyecto real, donde normalmente no querrás sembrar datos desde la app.
 
 ## Despliegue en Coolify
 
@@ -115,23 +122,30 @@ El server ya soporta transporte HTTP. En modo `streamable-http` expone:
 - `GET /health` → `ok` (para el health check)
 - `POST /mcp` → el endpoint del protocolo MCP (lo consume el agente/cliente)
 
-### Opción A — Docker Compose (recomendada, carga el seed sola)
+La app **se auto-inicializa**: al arrancar crea el esquema y carga los datos de
+ejemplo (`seed.sql`) si faltan. No hay que montar `seed.sql` ni tocar el
+contenedor de Postgres.
+
+### Opción A — Docker Compose (recomendada)
 
 Usa [`docker-compose.coolify.yml`](docker-compose.coolify.yml): levanta Postgres
-+ MCP juntos y carga `seed.sql` en el primer arranque.
++ MCP juntos.
 
 1. En Coolify crea un recurso **Docker Compose** apuntando a tu repo y a
    `docker-compose.coolify.yml`.
 2. (Opcional) Define `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` como
    variables del recurso; si no, usa los defaults (`library`).
-3. Asigna un **dominio** al servicio `mcp` (puerto **8000**). No expongas la DB.
+3. Asigna un **dominio** al servicio `mcp`. Para enrutar al puerto interno del
+   contenedor, escríbelo en el dominio: `https://<tu-dominio>:8000`. Coolify lo
+   sirve público en 443. No expongas la DB.
 
 > El endpoint MCP para el cliente/agente quedará en `https://<tu-dominio>/mcp`.
+> Health check: path `/health` (responde `ok`).
 
 ### Opción B — Application (Postgres por separado)
 
-1. **Postgres**: provisiona un contenedor Postgres manualmente y ejecuta el
-   contenido de [`seed.sql`](seed.sql) una vez.
+1. **Postgres**: provisiona un contenedor Postgres manualmente (vacío; la app lo
+   siembra sola al arrancar).
 2. **MCP**: crea un recurso *Application* apuntando a tu repo (usa el `Dockerfile`).
 3. **Variables de entorno** del MCP:
    - `DATABASE_URL` → hostname **interno** del Postgres (no `localhost`),
