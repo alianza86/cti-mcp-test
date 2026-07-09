@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "library": {
+      "type": "http",
+      "url": "https://mcp.dipa.dev/mcp"
+    }
+  }
+}

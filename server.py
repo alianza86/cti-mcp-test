@@ -108,8 +108,12 @@ def get_cursor():
 def search_books(query: str = "", genre: str = "", available_only: bool = False) -> list[dict]:
     """Busca libros por título y/o género.
 
+    La búsqueda por título es PARCIAL y no distingue mayúsculas ni acentos
+    (ej. "soledad" o "SOLEDAD" encuentran "Cien años de soledad"). No necesitas
+    el título exacto; pasa el texto que dio el usuario.
+
     Args:
-        query: Texto a buscar dentro del título (búsqueda parcial, ignora mayúsculas).
+        query: Texto a buscar dentro del título (parcial, sin importar acentos).
         genre: Filtra por género exacto (ej. "Cuento", "Novela"). Vacío = todos.
         available_only: Si es True, solo devuelve libros con copias disponibles.
 
@@ -121,7 +125,7 @@ def search_books(query: str = "", genre: str = "", available_only: bool = False)
                b.published_year, b.available_copies, b.total_copies
         FROM books b
         JOIN authors a ON a.id = b.author_id
-        WHERE b.title ILIKE %(q)s
+        WHERE unaccent(b.title) ILIKE unaccent(%(q)s)
           AND (%(genre)s = '' OR b.genre = %(genre)s)
           AND (NOT %(avail)s OR b.available_copies > 0)
         ORDER BY b.title
@@ -153,16 +157,20 @@ def get_book(book_id: int) -> dict | None:
 
 @mcp.tool()
 def books_by_author(author_name: str) -> list[dict]:
-    """Lista los libros de un autor buscando por su nombre (búsqueda parcial).
+    """Lista los libros de un autor buscando por su nombre.
+
+    Acepta nombres PARCIALES o aproximados y no distingue mayúsculas ni acentos
+    (ej. "garcia" o "GARCÍA" encuentran "Gabriel García Márquez"). No necesitas
+    el nombre completo ni exacto; pasa el texto que dio el usuario.
 
     Args:
-        author_name: Nombre o parte del nombre del autor (ej. "Borges").
+        author_name: Nombre o parte del nombre del autor (ej. "Borges", "garcia").
     """
     sql = """
         SELECT b.id, b.title, b.genre, b.published_year, b.available_copies
         FROM books b
         JOIN authors a ON a.id = b.author_id
-        WHERE a.name ILIKE %(name)s
+        WHERE unaccent(a.name) ILIKE unaccent(%(name)s)
         ORDER BY b.published_year
     """
     with get_cursor() as cur:

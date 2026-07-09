@@ -6,6 +6,9 @@
 -- La app (server.py) lo ejecuta al arrancar, así no dependemos de mounts
 -- ni de tocar el contenedor de Postgres a mano.
 
+-- Búsquedas que ignoran acentos ("garcia" encuentra "García").
+CREATE EXTENSION IF NOT EXISTS unaccent;
+
 CREATE TABLE IF NOT EXISTS authors (
     id          SERIAL PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
