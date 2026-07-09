@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16
+    container_name: mcp-library-db
+    environment:
+      POSTGRES_USER: library
+      POSTGRES_PASSWORD: library
+      POSTGRES_DB: library
+    ports:
+      # Host 5433 -> contenedor 5432 (el 5432 del host ya estaba ocupado)
+      - "5433:5432"
+    volumes:
+      # El seed.sql se ejecuta automáticamente la primera vez que arranca el contenedor
+      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      - library_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U library -d library"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  library_data:

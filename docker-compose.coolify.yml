@@ -1,0 +1,44 @@
+# Compose para desplegar en Coolify: Postgres + MCP juntos.
+# El seed.sql se carga automáticamente la primera vez que arranca Postgres.
+#
+# En Coolify: crea un recurso "Docker Compose", apunta a este archivo y asigna
+# un dominio al servicio "mcp" (puerto 8000). No expongas el puerto de la DB.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-library}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-library}
+      POSTGRES_DB: ${POSTGRES_DB:-library}
+    volumes:
+      # Carga tablas + datos en el primer arranque (solo si el volumen está vacío).
+      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      - library_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-library} -d ${POSTGRES_DB:-library}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mcp:
+    build: .
+    environment:
+      # "db" es el hostname interno del servicio de Postgres de arriba.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD:-library}@db:5432/${POSTGRES_DB:-library}
+      MCP_TRANSPORT: streamable-http
+      PORT: 8000
+    depends_on:
+      db:
+        condition: service_healthy
+    # Coolify asigna el dominio público a este puerto; no hace falta "ports:".
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  library_data:
